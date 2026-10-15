@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Couch Sync</title>
+<style>
+  :root { --bg:#111014; --panel:#1b1a20; --panel2:#24222b; --ink:#f2f0f5; --muted:#9d99a8; --accent:#ff6b4a; --ok:#4ade80; --warn:#facc15; --bad:#f87171; --line:#2e2c36; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 system-ui, -apple-system, sans-serif; }
+  button { font:inherit; border:0; border-radius:8px; padding:7px 12px; background:var(--panel2); color:var(--ink); cursor:pointer; }
+  button:hover { filter:brightness(1.2); } button.primary { background:var(--accent); color:#fff; font-weight:600; } button:disabled { opacity:.4; cursor:default; }
+  input, select { font:inherit; background:var(--panel2); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:7px 10px; }
+  .muted { color:var(--muted); } .small { font-size:12px; }
+  .hidden { display:none !important; }
+
+  /* lobby */
+  #lobby { max-width:420px; margin:12vh auto; padding:0 16px; display:flex; flex-direction:column; gap:12px; }
+  #lobby h1 { font-size:34px; margin:0; } #lobby .row { display:flex; gap:8px; } #lobby .row > input { flex:1; }
+
+  /* room */
+  #room { display:grid; grid-template-columns:1fr 380px; height:100vh; }
+  #stage { display:flex; flex-direction:column; min-width:0; }
+  header { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header .code { font:700 18px ui-monospace, monospace; letter-spacing:2px; }
+  .pill { padding:3px 10px; border-radius:99px; background:var(--panel2); font-size:12px; display:inline-flex; align-items:center; gap:6px; }
+  .dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+  #videoWrap { position:relative; background:#000; flex:1; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  video { width:100%; height:100%; object-fit:contain; }
+  #empty { position:absolute; text-align:center; color:var(--muted); padding:20px; }
+  #tapToPlay { position:absolute; inset:0; background:#000a; display:flex; align-items:center; justify-content:center; }
+  .float { position:absolute; bottom:70px; font-size:34px; pointer-events:none; animation:rise 2.6s ease-out forwards; }
+  .float span { display:block; font-size:11px; text-align:center; color:#fff; text-shadow:0 1px 2px #000; }
+  @keyframes rise { from { transform:translateY(0); opacity:1; } to { transform:translateY(-55vh); opacity:0; } }
+  #controls { display:flex; align-items:center; gap:10px; padding:8px 16px; background:var(--panel); }
+  #seekWrap { position:relative; flex:1; height:28px; display:flex; align-items:center; }
+  #seek { width:100%; accent-color:var(--accent); }
+  #marks { position:absolute; left:0; right:0; top:-4px; height:10px; pointer-events:none; }
+  #marks i { position:absolute; font-style:normal; font-size:10px; transform:translateX(-50%); }
+  #reacts { display:flex; gap:6px; padding:8px 16px 12px; background:var(--panel); flex-wrap:wrap; align-items:center; }
+  #reacts button { font-size:20px; padding:4px 10px; }
+  #nowTitle { font-weight:600; }
+
+  /* sidebar */
+  aside { background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; min-height:0; }
+  nav { display:flex; border-bottom:1px solid var(--line); }
+  nav button { flex:1; border-radius:0; background:none; padding:12px 4px; color:var(--muted); border-bottom:2px solid transparent; }
+  nav button.on { color:var(--ink); border-bottom-color:var(--accent); }
+  .tab { flex:1; overflow:auto; padding:12px; display:flex; flex-direction:column; gap:10px; min-height:0; }
+  #chatLog { flex:1; overflow:auto; display:flex; flex-direction:column; gap:6px; }
+  .msg b { color:var(--accent); } .msg.sys { color:var(--muted); font-size:12px; font-style:italic; }
+  .card { background:var(--panel2); border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:6px; }
+  .card .title { font-weight:600; } .card .acts { display:flex; gap:6px; flex-wrap:wrap; }
+  #tab-discover select { flex:1; min-width:0; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .chip { padding:3px 10px; border-radius:99px; background:var(--panel2); font-size:12px; cursor:pointer; border:1px solid transparent; }
+  .chip.on { border-color:var(--accent); color:var(--accent); }
+  .why { font-size:12px; color:var(--warn); }
+  .bar { height:6px; background:var(--line); border-radius:3px; overflow:hidden; } .bar > div { height:100%; background:var(--accent); }
+  .person { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px; background:var(--panel2); border-radius:8px; }
+  #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#000d; padding:8px 16px; border-radius:8px; display:none; z-index:9; }
+  mark { background:none; color:var(--accent); font-weight:700; }
+
+  @media (max-width:900px) { #room { grid-template-columns:1fr; grid-template-rows:auto 1fr; height:auto; } #videoWrap { aspect-ratio:16/9; flex:none; } aside { height:70vh; } }
+</style>
+</head>
+<body>
+
+<div id="lobby">
+  <h1>🛋️ Couch Sync</h1>
+  <div class="muted">Watch together, in sync. Create a room and share the link, or join with a code.</div>
+  <input id="nameIn" placeholder="Your name" maxlength="24">
+  <button class="primary" id="createBtn">Create a room</button>
+  <div class="row"><input id="codeIn" placeholder="Room code" maxlength="6" style="text-transform:uppercase"><button id="joinBtn">Join</button></div>
+  <div id="lobbyErr" style="color:var(--bad)"></div>
+</div>
+
+<div id="room" class="hidden">
+  <section id="stage">
+    <header>
+      <span class="code" id="roomCode"></span>
+      <button id="copyLink">Copy invite link</button>
+      <span class="pill"><span class="dot" id="connDot"></span><span id="connText">connecting</span></span>
+      <span class="pill" id="syncPill" title="Your playback offset from the room clock">sync –</span>
+      <span class="pill" id="latPill" title="Time for the last play/pause/seek to reach you">control –</span>
+      <span class="pill hidden" id="lockPill">🔒 host controls</span>
+    </header>
+    <div id="videoWrap">
+      <video id="video" playsinline preload="auto"></video>
+      <div id="empty">Nothing playing yet.<br>Pick something in <b>Discover</b>, or paste a video URL in <b>Playlist</b>.</div>
+      <div id="tapToPlay" class="hidden"><button class="primary" id="tapBtn">▶ Join playback</button></div>
+    </div>
+    <div id="controls">
+      <button id="playBtn" disabled>▶</button>
+      <div id="seekWrap"><div id="marks"></div><input id="seek" type="range" min="0" max="1000" value="0" disabled></div>
+      <span id="time" class="small muted">0:00 / 0:00</span>
+      <button id="muteBtn">🔊</button>
+      <button id="fsBtn">⛶</button>
+    </div>
+    <div id="reacts">
+      <span id="nowTitle" class="muted">—</span><span style="flex:1"></span>
+      <button data-e="😂">😂</button><button data-e="😮">😮</button><button data-e="❤️">❤️</button><button data-e="🔥">🔥</button><button data-e="👏">👏</button><button data-e="😱">😱</button>
+    </div>
+  </section>
+
+  <aside>
+    <nav>
+      <button data-tab="chat" class="on">Chat</button><button data-tab="discover">Discover</button><button data-tab="playlist">Playlist</button><button data-tab="polls">Polls</button><button data-tab="people">People</button>
+    </nav>
+    <div class="tab" id="tab-chat">
+      <div id="chatLog"></div>
+      <form id="chatForm" style="display:flex;gap:6px"><input id="chatIn" placeholder="Say something…" maxlength="500" style="flex:1" autocomplete="off"><button class="primary">Send</button></form>
+    </div>
+    <div class="tab hidden" id="tab-discover">
+      <input id="search" placeholder="Fuzzy search: try “chapln”, “haunted”, “horror 50s”" autocomplete="off">
+      <div class="chips" id="genres"></div>
+      <div style="display:flex;gap:6px">
+        <select id="lenSel"><option value="">Any length</option><option value="short">Shorts (&lt; 30 min)</option><option value="feature">Features</option></select>
+        <select id="decSel"><option value="">Any decade</option></select>
+        <select id="sortSel"><option value="rec">For this room</option><option value="pop">Most popular</option><option value="old">Oldest</option><option value="new">Newest</option></select>
+      </div>
+      <div class="small muted" id="pollPickInfo">Tick up to 4 titles to start a “what next?” poll.</div>
+      <button id="pollFromPicks" class="hidden primary">Start poll with picks</button>
+      <div id="movies" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+    <div class="tab hidden" id="tab-playlist">
+      <form id="urlForm" style="display:flex;gap:6px"><input id="urlIn" placeholder="Paste a .mp4/.webm URL" style="flex:1"><button>Add</button></form>
+      <div class="small muted">Vote ▲ to bump what plays next. When a video ends the top item starts for everyone.</div>
+      <div id="plist" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+    <div class="tab hidden" id="tab-polls">
+      <form id="pollForm" class="card">
+        <input id="pollQ" placeholder="Question" maxlength="140">
+        <input id="pollO" placeholder="Options, comma separated">
+        <button class="primary">Create poll</button>
+      </form>
+      <div id="pollList" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+    <div class="tab hidden" id="tab-people">
+      <label id="lockRow" class="hidden"><input type="checkbox" id="lockChk"> Only the host can control playback</label>
+      <div id="people" style="display:flex;flex-direction:column;gap:6px"></div>
+      <div class="small muted">Drift = how far each viewer's video is from the room clock. It's corrected automatically: small drift by nudging playback speed, big drift by seeking.</div>
+    </div>
+  </aside>
+</div>
+<div id="toast"></div>
+<script src="/app.js"></script>
+</body>
+</html>

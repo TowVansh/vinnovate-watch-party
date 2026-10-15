@@ -1,0 +1,15 @@
+{
+  "name": "couch-sync",
+  "version": "1.0.0",
+  "description": "Real-time watch party with synchronized playback",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test.js"
+  },
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
