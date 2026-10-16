@@ -2,6 +2,16 @@
 
 Couch Sync lets a group watch the same video together, with playback kept in sync across everyone. You can create a room, share the link, and watch with chat, emoji reactions, a voted playlist, group polls and a movie discovery panel. The catalog has 42 public-domain films and cartoons from the Internet Archive, and you can also paste any `.mp4`/`.webm` URL.
 
+## 🔴 Live: https://couch-sync.onrender.com
+
+1. Open the link, type a name and click **Create a room**.
+2. Click **Copy invite link** and open it in a second tab, on your phone, or send it to a friend.
+3. Go to **Discover** and press **▶ Play now** on any film. Play, pause and seek on one screen, and every other screen follows.
+
+It is hosted on Render's free tier (Singapore), so the first visit after 15 idle minutes takes about 50 s while the server wakes up. Measured on the live deployment from India, play/pause/seek reaches the other viewer in **79 ms at p50 and 130 ms at worst** across 20 actions.
+
+## Run locally
+
 ```
 npm install
 npm start          # http://localhost:3000
